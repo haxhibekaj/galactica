@@ -19,32 +19,32 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create permissions
+        // 1. First, create permissions
         $permissions = [
-            'view_resources',
-            'manage_resources',
-            'transfer_resources',
-            'view_trade_routes',
-            'manage_trade_routes',
-            'view_starships',
-            'manage_starships',
-            'assign_routes',
-            'view_agreements',
-            'manage_agreements',
-            'view_weather',
-            'manage_weather',
-            'manage_roles',
+            'view_resources' => 'Can view resource inventories',
+            'manage_resources' => 'Can manage resource inventories',
+            'transfer_resources' => 'Can transfer resources between planets',
+            'view_trade_routes' => 'Can view trade routes',
+            'manage_trade_routes' => 'Can create and modify trade routes',
+            'view_starships' => 'Can view starship fleet',
+            'manage_starships' => 'Can manage starship operations',
+            'assign_routes' => 'Can assign trade routes to starships',
+            'view_agreements' => 'Can view trade agreements',
+            'manage_agreements' => 'Can create and modify trade agreements',
+            'view_weather' => 'Can view space weather',
+            'manage_weather' => 'Can manage weather events',
+            'manage_roles' => 'Can manage roles and permissions',
         ];
 
         $permissionIds = [];
-        foreach ($permissions as $permission) {
-            $permissionIds[] = Permission::create([
-                'name' => $permission,
-                'description' => 'Can ' . str_replace('_', ' ', $permission)
-            ])->id;
+        foreach ($permissions as $name => $description) {
+            $permissionIds[] = Permission::firstOrCreate(
+                ['name' => $name],
+                ['description' => $description]
+            )->id;
         }
 
-        // Create roles with their permissions
+        // 2. Create roles with their permissions
         $adminRole = Role::create([
             'name' => 'admin',
             'description' => 'Administrator with full access'
@@ -81,7 +81,7 @@ class DatabaseSeeder extends Seeder
             ])->pluck('id')
         );
 
-        // Create users
+        // 3. Create users and assign roles
         $admin = User::create([
             'name' => 'Admin User',
             'email' => 'admin@galactica.test',
@@ -103,51 +103,90 @@ class DatabaseSeeder extends Seeder
         ]);
         $trader->roles()->attach($traderRole->id);
 
-        // Create planets
+        // 4. Create planets first (needed for trade routes)
         $planets = [
-            ['name' => 'Earth', 'coordinates' => ['x' => 314, 'y' => 100, 'z' => 176]],
-            ['name' => 'Mars', 'coordinates' => ['x' => 108, 'y' => 431, 'z' => 224]],
-            ['name' => 'Venus', 'coordinates' => ['x' => -34, 'y' => 512, 'z' => 333]],
-            ['name' => 'Jupiter', 'coordinates' => ['x' => 202, 'y' => 180, 'z' => 209]],
+            ['name' => 'Earth', 'coordinates' => ['x' => 513, 'y' => 217, 'z' => 337]],
+            ['name' => 'Mars', 'coordinates' => ['x' => 105, 'y' => 270, 'z' => 37]],
+            ['name' => 'Venus', 'coordinates' => ['x' => -421, 'y' => -247, 'z' => 364]],
+            ['name' => 'Jupiter', 'coordinates' => ['x' => 200, 'y' => 180, 'z' => 444]],
         ];
 
         foreach ($planets as $planetData) {
             Planet::create([
                 'name' => $planetData['name'],
-                'coordinates' => json_encode($planetData['coordinates']),
+                'coordinates' => $planetData['coordinates']
             ]);
         }
 
-        // Create resources
-        $resources = ['Water', 'Food', 'Minerals', 'Fuel', 'Technology'];
-        foreach ($resources as $resourceName) {
-            Resource::create(['name' => $resourceName]);
+        // 5. Create resources (needed for trade routes)
+        $resources = [
+            [
+                'name' => 'Water',
+                'base_price' => 100.00,
+                'unit' => 'ton',
+                'rarity' => 'common',
+                'weight_per_unit' => 1.00
+            ],
+            [
+                'name' => 'Food',
+                'base_price' => 200.00,
+                'unit' => 'ton',
+                'rarity' => 'common',
+                'weight_per_unit' => 1.00
+            ],
+            [
+                'name' => 'Minerals',
+                'base_price' => 500.00,
+                'unit' => 'ton',
+                'rarity' => 'uncommon',
+                'weight_per_unit' => 2.00
+            ],
+            [
+                'name' => 'Fuel',
+                'base_price' => 1000.00,
+                'unit' => 'barrel',
+                'rarity' => 'rare',
+                'weight_per_unit' => 0.50
+            ],
+            [
+                'name' => 'Technology',
+                'base_price' => 2000.00,
+                'unit' => 'piece',
+                'rarity' => 'epic',
+                'weight_per_unit' => 0.25
+            ]
+        ];
+
+        foreach ($resources as $resourceData) {
+            Resource::create($resourceData);
         }
 
-        // Create trade routes
-        $planets = Planet::all();
-        $resources = Resource::all();
+        // 6. Create trade routes (needs planets and resources)
+        $planetsCollection = Planet::all();
+        $resourcesCollection = Resource::all();
         
         for ($i = 0; $i < 5; $i++) {
-            $start = $planets->random();
-            $end = $planets->where('id', '!=', $start->id)->random();
+            $start = $planetsCollection->random();
+            $end = $planetsCollection->where('id', '!=', $start->id)->random();
             
             TradeRoute::create([
                 'name' => "Route {$start->name} to {$end->name}",
                 'starting_planet_id' => $start->id,
                 'destination_planet_id' => $end->id,
-                'resource_id' => $resources->random()->id,
-                'travel_time' => rand(10, 100),
+                'resource_id' => $resourcesCollection->random()->id,
+                'travel_time' => rand(10, 100) // in seconds for testing
             ]);
         }
 
-        // Create starships
+        // 7. Finally, create starships (needs trade routes and planets)
         $tradeRoutes = TradeRoute::all();
         $statuses = ['idle', 'in_transit', 'maintenance'];
 
         for ($i = 0; $i < 10; $i++) {
             $route = $tradeRoutes->random();
             $status = $statuses[array_rand($statuses)];
+            $currentLocation = $route->startingPlanet;
+            $destination = $status === 'in_transit' ? $route->destinationPlanet : null;
 
             Starship::create([
                 'name' => "Starship-" . str_pad($i + 1, 3, '0', STR_PAD_LEFT),
@@ -155,10 +194,10 @@ class DatabaseSeeder extends Seeder
                 'cargo_capacity' => rand(1000, 10000),
                 'trade_route_id' => $route->id,
                 'status' => $status,
-                'current_location_id' => $route->starting_planet_id,
-                'destination_id' => $status === 'in_transit' ? $route->destination_planet_id : null,
-                'departure_time' => $status === 'in_transit' ? Carbon::now()->subHours(rand(1, 5)) : null,
-                'arrival_time' => $status === 'in_transit' ? Carbon::now()->addHours(rand(1, 5)) : null,
+                'current_location_id' => $currentLocation->id,
+                'destination_id' => $destination?->id,
+                'departure_time' => $status === 'in_transit' ? Carbon::now()->subSeconds(rand(1, 30)) : null,
+                'arrival_time' => $status === 'in_transit' ? Carbon::now()->addSeconds(rand(30, 60)) : null,
                 'maintenance_due_at' => Carbon::now()->addMonths(3),
             ]);
         }
