@@ -58,15 +58,16 @@ git clone https://github.com/haxhibekaj/galactica.git
 cd galactica
 ```
 
-3. Install dependencies
+3. Install dependencies and bundle frontend
 ```bash
 composer install
-npm install
+npm install && npm run build
 ```
 
 4. Setup environment
 ```bash
 cp .env.example .env
+php artisan key:generate
 ```
 
 5. Run migrations and seed the database
@@ -77,6 +78,10 @@ php artisan migrate --seed
 6. Run the development server
 ```bash
 php artisan serve
+```
+or
+```bash
+composer run dev
 ```
 
 7. Access the application at http://localhost:8000
